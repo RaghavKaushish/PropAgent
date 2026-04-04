@@ -11,9 +11,11 @@ from langchain_core.tools import tool
 # 1. API KEY SETUP
 # ==========================================
 # PASTE YOUR KEY INSIDE THE QUOTES BELOW
-MY_API_KEY = "AIzaSyBC_Qs_xUJrMrf7E8mk4i4j84_mbEULGwA"
-os.environ["GOOGLE_API_KEY"] = MY_API_KEY
 
+
+# This reads the key from the Streamlit Cloud dashboard, not your code!
+MY_API_KEY = st.secrets["GOOGLE_API_KEY"]
+os.environ["GOOGLE_API_KEY"] = MY_API_KEY
 # ==========================================
 # 2. LOAD MODEL & DEFINE TOOL
 # ==========================================
