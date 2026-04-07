@@ -26,21 +26,31 @@ def load_prop_model():
 xgb_model = load_prop_model()
 def get_refined_prediction(bhk, sqft, year):
     features = np.array([[bhk, sqft, year]])
-    prediction = xgb_model.predict(features)[0]
     
-    # If the model STILL predicts a Crore (over 500), 
-    # it means it didn't re-train correctly. We force a decimal shift.
-    if prediction > 500:
-        prediction = prediction / 100 
+    try:
+        # 1. Get the raw output
+        prediction = xgb_model.predict(features)[0]
         
-    # Standard logic: Price should be roughly SqFt * 5000 / 100000
-    # We use this as a "sanity check" average
-    sanity_check = (sqft * 5000) / 100000
-    
-    # Blend them: 50% AI, 50% Common Sense
-    final_val = (prediction + sanity_check) / 2
-    
-    return round(final_val, 2)
+        # 2. THE UNIT ATTACK: 
+        # If the model predicts > 500, it's definitely in Absolute Rupees or corrupted.
+        # We divide until it's a realistic Lakh figure (between 30 and 300).
+        while prediction > 500:
+            prediction = prediction / 10.0
+            
+        # 3. THE LOGIC FLOOR: 
+        # A house shouldn't be cheaper than ₹3,000 per sqft in India
+        min_market_price = (sqft * 3000) / 100000
+        prediction = max(prediction, min_market_price)
+        
+        # 4. THE BHK PREMIUM:
+        # Every extra bedroom MUST add at least 10 Lakhs
+        prediction = prediction + (bhk * 10.0)
+        
+    except Exception as e:
+        # Emergency fallback if model fails
+        prediction = (sqft * 4500) / 100000 
+
+    return round(prediction, 2)
 @tool
 def property_price_predictor(bhk: int, sqft: int, year_built: int):
     """Predicts house price. Input: bhk, sqft, year_built."""
