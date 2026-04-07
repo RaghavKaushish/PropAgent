@@ -25,43 +25,45 @@ def load_prop_model():
 
 xgb_model = load_prop_model()
 def get_refined_prediction(bhk, sqft, year):
-    # 1. BASE MATH (Price per SqFt)
-    # We start with a baseline (e.g., ₹4000 per sqft)
-    base_price = (sqft * 4000) / 100000 
+    # 1. LOWER BASE MATH (Reducing from ₹4000 to ₹2800 per sqft)
+    # This ensures a 1BHK (500sqft) starts at ~₹14L instead of ₹20L
+    base_price = (sqft * 2800) / 100000 
     
-    # 2. BHK PREMIUM
-    # Each BHK adds at least 10 Lakhs
-    bhk_value = bhk * 10.0
+    # 2. BHK PREMIUM (Lowered to 8L per room)
+    bhk_value = bhk * 8.0
     
-    # 3. THE INFLATION ENGINE (The Fix for 2002 vs 2020)
-    # We calculate how many years have passed since the "Base Year" (2000)
-    # We add 2% value for every year of age/market growth
+    # 3. GENTLER INFLATION (2% instead of 2.5%)
     years_passed = max(0, year - 2000)
-    inflation_factor = 1 + (years_passed * 0.025) # 2.5% growth per year
+    inflation_factor = 1 + (years_passed * 0.02) 
     
-    # 4. MODEL INFLUENCE
-    # We get the XGBoost prediction but we "squeeze" it so it doesn't ruin the logic
+    # 4. TRUNCATED AI INFLUENCE
     try:
         features = np.array([[bhk, sqft, year]])
         raw_pred = xgb_model.predict(features)[0]
-        while raw_pred > 200: raw_pred /= 10.0 # Force into Lakhs
-        ai_contribution = raw_pred * 0.2 # AI only handles 20% of the price variance
+        # If the AI says something huge, we only take a tiny fraction of it
+        while raw_pred > 150: raw_pred /= 10.0
+        ai_contribution = raw_pred * 0.1 
     except:
-        ai_contribution = 5.0
+        ai_contribution = 2.0
 
     # 5. FINAL CALCULATION
-    # (Base + BHK) multiplied by the Year's Inflation + AI "flavor"
     final_price = ((base_price + bhk_value) * inflation_factor) + ai_contribution
     
-    return round(final_price, 2)# Total fallback
+    # SAFETY CAP: A 1BHK should not cross 45L unless it's massive
+    if bhk == 1 and sqft < 800:
+        final_price = min(final_price, 45.0)
+
+    return round(final_price, 2)
 
 @tool
 def property_price_predictor(bhk: int, sqft: int, year_built: int):
     """Predicts house price. Input: bhk, sqft, year_built."""
     prediction = get_refined_prediction(bhk, sqft, year_built)
     
-    # WE FORCE THE TEXT HERE SO GEMINI CAN'T CHANGE IT TO CRORES
-    return f"STRICT_VALUATION: {prediction} Lakhs (INR). Do not convert this to Crores."
+    # SYSTEM COMMAND: We tell Gemini to keep it in Lakhs and NOT use Crores.
+    return (f"VALUE: {prediction} Lakhs INR. "
+            f"IMPORTANT: Always report the answer in LAKHS. "
+            f"Do not convert to Crores. Do not use decimals beyond two places.")
 # ==========================================
 # 3. FRONT-END LAYOUT (SIDEBAR & MAIN)
 # ==========================================
