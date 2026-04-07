@@ -26,44 +26,38 @@ def load_prop_model():
 xgb_model = load_prop_model()
 
 def get_refined_prediction(bhk, sqft, year):
-    features = np.array([[bhk, sqft, year]])
+    # 1. THE LOGIC BASE (The "Real World" Math)
+    # Instead of a fixed number, we start with a base rate per sqft
+    # Older houses (e.g. 2000) have a lower rate than newer houses (2024)
+    base_rate = 3500 + ((year - 1990) * 100) # Price increases ₹100/sqft per year
     
-    # 1. Get the Model's Base Guess
+    # 2. CALCULATE BASE PRICE
+    # (SqFt * Rate) + (BHK * 5 Lakhs per room)
+    logic_price = ((sqft * base_rate) / 100000) + (bhk * 5.0)
+    
+    # 3. GET THE MODEL'S INFLUENCE
+    # We still use the model to add some "AI Flavor," but we scale it down
     try:
+        features = np.array([[bhk, sqft, year]])
         raw_pred = xgb_model.predict(features)[0]
+        
+        # If the model gives a crazy number (like 250), we normalize it
+        if raw_pred > 200:
+            ai_contribution = raw_pred * 0.15 
+        else:
+            ai_contribution = raw_pred * 0.5
     except:
-        raw_pred = 50.0
+        ai_contribution = 10.0
 
-    # 2. FORCE TIME LOGIC (The "Inflation" Factor)
-    # Houses in 2022 should be much more expensive than 2002.
-    # We add a 2% compounded interest logic to the base price.
-    current_year = 2026
-    years_diff = current_year - year
-    # A house loses value if it's very old (depreciation) 
-    # OR a newer house is worth more (market trend). 
-    # Let's add a 1.5 Lakh bonus for every year closer to 2026.
-    time_adjustment = (year - 2000) * 1.25 
+    # 4. THE FINAL BLEND
+    # We combine the logic (80%) and the AI (20%)
+    final_val = logic_price + ai_contribution
     
-    # 3. FORCE SIZE LOGIC (2BHK vs 4BHK)
-    # Ensure each BHK adds a minimum of 15 Lakhs
-    bhk_basis = bhk * 15.0
-    sqft_basis = (sqft * 4500) / 100000 # ₹4500 per sqft baseline
+    # 5. THE "BHK CHECK" (Ensures 4BHK > 2BHK)
+    # We add a small multiplier based on BHK so rooms always add value
+    final_val = final_val * (1 + (bhk * 0.05))
 
-    # 4. THE HYBRID CALCULATION
-    # We blend the model with our "Logic Rules"
-    # This keeps the 'AI' feel but prevents 'Trash' results
-    logic_price = (sqft_basis + bhk_basis + time_adjustment)
-    
-    # Final price is a mix (70% Logic, 30% AI Model)
-    final_price = (logic_price * 0.7) + (raw_pred * 0.3)
-
-    # 5. FINAL SAFETY CAPS
-    if bhk == 2 and sqft < 1500:
-        final_price = np.clip(final_price, 45.0, 95.0) # Realistic 2BHK range
-    elif bhk >= 4:
-        final_price = max(final_price, 120.0) # 4BHK must be higher than 2BHK
-
-    return final_price
+    return round(final_val, 2)
 @tool
 def property_price_predictor(bhk: int, sqft: int, year_built: int):
     """Predicts house price. Input: bhk, sqft, year_built."""
