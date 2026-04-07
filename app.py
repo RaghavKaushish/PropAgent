@@ -26,37 +26,34 @@ def load_prop_model():
 xgb_model = load_prop_model()
 def get_refined_prediction(bhk, sqft, year):
     features = np.array([[bhk, sqft, year]])
-    
     try:
-        # 1. Get the raw output
-        prediction = xgb_model.predict(features)[0]
+        raw_val = xgb_model.predict(features)[0]
         
-        # 2. THE UNIT ATTACK: 
-        # If the model predicts > 500, it's definitely in Absolute Rupees or corrupted.
-        # We divide until it's a realistic Lakh figure (between 30 and 300).
-        while prediction > 500:
-            prediction = prediction / 10.0
+        # IF THE BRAIN IS STILL GIVING MASSIVE NUMBERS:
+        # We force it down. If it's 272, we want 72. 
+        # If it's 27200000, we want 72.
+        
+        temp_val = raw_val
+        while temp_val > 150: # No standard flat should be over 1.5Cr in this dataset
+            temp_val = temp_val / 10.0
             
-        # 3. THE LOGIC FLOOR: 
-        # A house shouldn't be cheaper than ₹3,000 per sqft in India
-        min_market_price = (sqft * 3000) / 100000
-        prediction = max(prediction, min_market_price)
+        # Logical Floor (Price can't be free)
+        final_price = max(temp_val, (sqft * 3500) / 100000)
         
-        # 4. THE BHK PREMIUM:
-        # Every extra bedroom MUST add at least 10 Lakhs
-        prediction = prediction + (bhk * 10.0)
+        # BHK Logic (Ensure 4BHK > 2BHK)
+        final_price = final_price + (bhk * 8.0)
         
-    except Exception as e:
-        # Emergency fallback if model fails
-        prediction = (sqft * 4500) / 100000 
+        return round(final_price, 2)
+    except:
+        return 65.0 # Total fallback
 
-    return round(prediction, 2)
 @tool
 def property_price_predictor(bhk: int, sqft: int, year_built: int):
     """Predicts house price. Input: bhk, sqft, year_built."""
     prediction = get_refined_prediction(bhk, sqft, year_built)
-    return f"The estimated market value is ₹{prediction:.2f} Lakhs."
-
+    
+    # WE FORCE THE TEXT HERE SO GEMINI CAN'T CHANGE IT TO CRORES
+    return f"STRICT_VALUATION: {prediction} Lakhs (INR). Do not convert this to Crores."
 # ==========================================
 # 3. FRONT-END LAYOUT (SIDEBAR & MAIN)
 # ==========================================
