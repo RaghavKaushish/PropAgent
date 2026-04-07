@@ -24,39 +24,22 @@ def load_prop_model():
     return model
 
 xgb_model = load_prop_model()
-
 def get_refined_prediction(bhk, sqft, year):
-    # 1. THE LOGIC BASE (The "Real World" Math)
-    # Instead of a fixed number, we start with a base rate per sqft
-    # Older houses (e.g. 2000) have a lower rate than newer houses (2024)
-    base_rate = 3500 + ((year - 1990) * 100) # Price increases ₹100/sqft per year
+    features = np.array([[bhk, sqft, year]])
+    prediction = xgb_model.predict(features)[0]
     
-    # 2. CALCULATE BASE PRICE
-    # (SqFt * Rate) + (BHK * 5 Lakhs per room)
-    logic_price = ((sqft * base_rate) / 100000) + (bhk * 5.0)
-    
-    # 3. GET THE MODEL'S INFLUENCE
-    # We still use the model to add some "AI Flavor," but we scale it down
-    try:
-        features = np.array([[bhk, sqft, year]])
-        raw_pred = xgb_model.predict(features)[0]
+    # If the model STILL predicts a Crore (over 500), 
+    # it means it didn't re-train correctly. We force a decimal shift.
+    if prediction > 500:
+        prediction = prediction / 100 
         
-        # If the model gives a crazy number (like 250), we normalize it
-        if raw_pred > 200:
-            ai_contribution = raw_pred * 0.15 
-        else:
-            ai_contribution = raw_pred * 0.5
-    except:
-        ai_contribution = 10.0
-
-    # 4. THE FINAL BLEND
-    # We combine the logic (80%) and the AI (20%)
-    final_val = logic_price + ai_contribution
+    # Standard logic: Price should be roughly SqFt * 5000 / 100000
+    # We use this as a "sanity check" average
+    sanity_check = (sqft * 5000) / 100000
     
-    # 5. THE "BHK CHECK" (Ensures 4BHK > 2BHK)
-    # We add a small multiplier based on BHK so rooms always add value
-    final_val = final_val * (1 + (bhk * 0.05))
-
+    # Blend them: 50% AI, 50% Common Sense
+    final_val = (prediction + sanity_check) / 2
+    
     return round(final_val, 2)
 @tool
 def property_price_predictor(bhk: int, sqft: int, year_built: int):
