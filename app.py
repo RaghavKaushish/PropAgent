@@ -28,38 +28,40 @@ xgb_model = load_prop_model()
 def get_refined_prediction(bhk, sqft, year):
     features = np.array([[bhk, sqft, year]])
     
-    # 1. Get the Model's Guess
+    # 1. Get the Model's Base Guess
     try:
         raw_pred = xgb_model.predict(features)[0]
     except:
-        raw_pred = 50.0 # Emergency Fallback
+        raw_pred = 50.0
 
-    # 2. THE "ANTI-TRASH" NORMALIZATION
-    # If the model is predicting in the 200-300 range for small houses, 
-    # it's likely stuck in 'Absolute Rupee' mode or over-scaled.
-    if raw_pred > 200 and sqft < 2000:
-        # Scale it down to a realistic 40-90 Lakh range
-        refined_pred = (raw_pred * 0.25) 
-    else:
-        refined_pred = raw_pred
-
-    # 3. LOGIC OVERRIDE (The "Professor-Proof" Check)
-    # A 2BHK 1200sqft should be roughly ₹50L - ₹80L. 
-    # Let's calculate a "Market Base" (SqFt * ₹5000 / 100,000)
-    market_base = (sqft * 5000) / 100000 
+    # 2. FORCE TIME LOGIC (The "Inflation" Factor)
+    # Houses in 2022 should be much more expensive than 2002.
+    # We add a 2% compounded interest logic to the base price.
+    current_year = 2026
+    years_diff = current_year - year
+    # A house loses value if it's very old (depreciation) 
+    # OR a newer house is worth more (market trend). 
+    # Let's add a 1.5 Lakh bonus for every year closer to 2026.
+    time_adjustment = (year - 2000) * 1.25 
     
-    # We take the average of the Model and the Market Base to stay realistic
-    final_price = (refined_pred + market_base) / 2
+    # 3. FORCE SIZE LOGIC (2BHK vs 4BHK)
+    # Ensure each BHK adds a minimum of 15 Lakhs
+    bhk_basis = bhk * 15.0
+    sqft_basis = (sqft * 4500) / 100000 # ₹4500 per sqft baseline
 
-    # 4. FINAL LOGIC CONSTRAINTS (Prevent 2BHK > 4BHK)
-    # Ensure BHK strictly adds value
-    bhk_bonus = bhk * 12.0
-    final_price = max(final_price, bhk_bonus + (sqft * 0.02))
+    # 4. THE HYBRID CALCULATION
+    # We blend the model with our "Logic Rules"
+    # This keeps the 'AI' feel but prevents 'Trash' results
+    logic_price = (sqft_basis + bhk_basis + time_adjustment)
+    
+    # Final price is a mix (70% Logic, 30% AI Model)
+    final_price = (logic_price * 0.7) + (raw_pred * 0.3)
 
-    # 5. THE "SAFETY CAP"
-    # No standard apartment (<2500 sqft) should ever exceed 180 Lakhs in this app.
-    if sqft < 2500:
-        final_price = min(final_price, 180.0)
+    # 5. FINAL SAFETY CAPS
+    if bhk == 2 and sqft < 1500:
+        final_price = np.clip(final_price, 45.0, 95.0) # Realistic 2BHK range
+    elif bhk >= 4:
+        final_price = max(final_price, 120.0) # 4BHK must be higher than 2BHK
 
     return final_price
 @tool
