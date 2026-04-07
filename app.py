@@ -26,23 +26,24 @@ def load_prop_model():
 xgb_model = load_prop_model()
 
 def get_refined_prediction(bhk, sqft, year):
-    """Internal helper to get prediction and apply noise filtering."""
     features = np.array([[bhk, sqft, year]])
     raw_pred = xgb_model.predict(features)[0]
     
-    # --- NOISE FILTER LOGIC ---
-    # 1. Cap the price: Unless it's a massive mansion, cap predictions at 500 Lakhs (5 Cr)
-    # to avoid the 'Luxury Outlier' skewing common 2BHK/3BHK results.
-    if sqft < 3000:
-        refined_pred = min(raw_pred, 500.0) 
-    else:
-        refined_pred = raw_pred
-        
-    # 2. Floor the price: Ensure no prediction goes below a realistic 10 Lakhs
-    refined_pred = max(refined_pred, 10.0)
+    # 1. Base Logic: A house shouldn't cost less than ₹2,500 per sqft
+    min_logic_price = (sqft * 2500) / 100000 
     
-    return refined_pred
-
+    # 2. Base Logic: Each BHK adds value (e.g., min 15L per bedroom)
+    bhk_floor = bhk * 15.0
+    
+    # Take the highest of the three to ensure a 4BHK > 2BHK
+    final_price = max(raw_pred, min_logic_price, bhk_floor)
+    
+    # 3. The "Anti-Crore" Cap
+    # If it's a standard house, don't let it exceed 3.5 Crores
+    if sqft < 4000:
+        final_price = min(final_price, 350.0)
+        
+    return final_price
 @tool
 def property_price_predictor(bhk: int, sqft: int, year_built: int):
     """Predicts house price. Input: bhk, sqft, year_built."""
