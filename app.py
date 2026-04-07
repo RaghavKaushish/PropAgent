@@ -56,7 +56,7 @@ st.set_page_config(page_title="PropAgent AI", layout="wide")
 
 # Data Check for VIVA (Helps you explain the dataset to the teacher)
 try:
-    df_sample = pd.read_csv('indian housing prices.csv')
+   df_sample = pd.read_csv('housing_lite.csv')
     # Use actual column names from your CSV here if they differ
     # df_sample = df_sample.rename(columns={'Price': 'price', 'Area': 'sqft'})
 except:
