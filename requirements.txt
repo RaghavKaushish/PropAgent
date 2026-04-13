@@ -6,3 +6,4 @@ plotly
 langchain-google-genai
 langchain
 langchain-core
+scikit-learn
