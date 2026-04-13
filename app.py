@@ -18,16 +18,18 @@ os.environ["GOOGLE_API_KEY"] = MY_API_KEY
 # ==========================================
 @st.cache_resource
 def load_prop_model():
+    @st.cache_resource
+def load_prop_model():
     model = xgb.XGBRegressor()
-    try:
-        # Check if file exists before loading
-        if os.path.exists('prop_model.json'):
-            model.load_model('prop_model.json')
-        else:
-            st.error("Model file 'prop_model.json' not found. Using logic-only mode.")
-    except Exception as e:
-        # This catches version mismatch errors
-        st.warning("Model version mismatch or corrupt file. Switching to Heuristic Engine.")
+    # Update this line to match your new filename!
+    model_path = 'prop_model_updated.json' 
+    
+    if os.path.exists(model_path):
+        try:
+            model.load_model(model_path)
+        except Exception as e:
+            # If there is a version mismatch, we still want the app to run
+            print(f"Model load failed: {e}")
     return model
 
 xgb_model = load_prop_model()
