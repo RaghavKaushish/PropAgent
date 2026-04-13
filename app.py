@@ -18,8 +18,7 @@ os.environ["GOOGLE_API_KEY"] = MY_API_KEY
 # ==========================================
 @st.cache_resource
 def load_prop_model():
-    @st.cache_resource
-def load_prop_model():
+
     model = xgb.XGBRegressor()
     # Update this line to match your new filename!
     model_path = 'prop_model_updated.json' 
