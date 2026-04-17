@@ -142,33 +142,47 @@ tools = [property_price_predictor, investment_advisor]
 # ==========================================
 # 4. AI CHAT INTERFACE
 # ==========================================
+# 4. AI CHAT INTERFACE
+# ==========================================
 st.title("🤖 PropAgent AI Assistant")
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "I'm ready! I've been optimized to filter out market noise. Ask me about house prices."}]
+    st.session_state.messages = [{"role": "assistant", "content": "I'm ready! Ask me about prices or if a deal is a good investment."}]
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-if prompt := st.chat_input("Ask: What's the price of a 3BHK 1500sqft home?"):
+if prompt := st.chat_input("Ask: Is a 3BHK for 80L a good investment?"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
         try:
-            # Using the latest Gemini model
-            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
-            llm_with_tools = llm.bind_tools([property_price_predictor])
+            # Using Gemini 1.5 Flash (Most stable for tool use)
+            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0)
             
+            # FIX 1: Bind BOTH tools so the AI can choose the right one
+            llm_with_tools = llm.bind_tools([property_price_predictor, investment_advisor])
+            
+            # The AI decides which tool to use
             ai_msg = llm_with_tools.invoke(prompt)
             
             if ai_msg.tool_calls:
+                responses = []
                 for tool_call in ai_msg.tool_calls:
-                    result = property_price_predictor.invoke(tool_call["args"])
-                    final_resp = llm.invoke(f"The tool said: {result}. Explain this value concisely to the user.")
-                    response_text = final_resp.content
+                    # FIX 2: Dynamic tool selection
+                    if tool_call["name"] == "investment_advisor":
+                        result = investment_advisor.invoke(tool_call["args"])
+                    else:
+                        result = property_price_predictor.invoke(tool_call["args"])
+                    
+                    # Explain the tool result with your specific instructions
+                    final_resp = llm.invoke(f"{instructions}\n\nThe tool said: {result}. Give a professional advice.")
+                    responses.append(final_resp.content)
+                
+                response_text = "\n\n".join(responses)
             else:
                 response_text = ai_msg.content
                 
