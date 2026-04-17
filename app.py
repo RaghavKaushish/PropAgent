@@ -96,29 +96,36 @@ with st.sidebar:
         fig = px.line(df_plot, x="SqFt", y="Price", title="Price vs. Size (Refined)")
         st.plotly_chart(fig, use_container_width=True)
         # 1. ADD THIS NEW TOOL
-@tool
+@tool 
 def investment_advisor(bhk: int, sqft: int, current_listing_price: float, year_built: int):
-    """
-    Analyzes if a property is a good investment. 
-    Compares listing price to market fair value.
-    """
-    # Get Fair Market Value from our logic
+    """Analyzes property investment potential by comparing listing to market value."""
+    
+    # 1. Get Values
     fair_market_value = get_refined_prediction(bhk, sqft, year_built)
+    future_value = get_refined_prediction(bhk, sqft, year_built + 5) # 5-year outlook
     
-    # Get Future Value (assuming 5 years of appreciation)
-    future_value = get_refined_prediction(bhk, sqft, year_built + 5)
+    # 2. Logic Fixes
+    valuation_gap = fair_market_value - current_listing_price
+    is_underpriced = current_listing_price < fair_market_value
     
+    # ROI Formula: (Profit / Investment) * 100
+    # Profit = Future Value - What you paid today
     profit_potential = future_value - current_listing_price
     roi = (profit_potential / current_listing_price) * 100
     
-    # Valuation Gap
-    is_underpriced = current_listing_price < fair_market_value
+    # 3. Build a "No-Fail" Data String
+    # We use very clear labels so the AI doesn't hallucinate
+    status = "UNDERPRICED (Good Deal)" if is_underpriced else "OVERPRICED"
     
     analysis = (
-        f"Fair Market Value: ₹{fair_market_value}L. "
-        f"Predicted Value in 5 years: ₹{future_value}L. "
-        f"Potential ROI: {round(roi, 2)}%. "
-        f"Underpriced: {'Yes' if is_underpriced else 'No'}."
+        f"--- DATA REPORT ---\n"
+        f"Market Valuation: ₹{fair_market_value}L\n"
+        f"Your Listing Price: ₹{current_listing_price}L\n"
+        f"Status: {status}\n"
+        f"Instant Equity: ₹{valuation_gap}L\n"
+        f"5-Year Projection: ₹{future_value}L\n"
+        f"Total Potential ROI: {round(roi, 2)}%\n"
+        f"-------------------"
     )
     return analysis
 
