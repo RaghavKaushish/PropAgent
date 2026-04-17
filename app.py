@@ -161,8 +161,10 @@ if prompt := st.chat_input("Ask: Is a 3BHK for 80L a good investment?"):
     with st.chat_message("assistant"):
         try:
             # Using Gemini 1.5 Flash (Most stable for tool use)
-            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0)
+            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
             # Change this line:
+            # Change the model name to the 2026 stable version
+
 
 
             
