@@ -95,6 +95,44 @@ with st.sidebar:
         df_plot = pd.DataFrame({"SqFt": sizes, "Price": preds})
         fig = px.line(df_plot, x="SqFt", y="Price", title="Price vs. Size (Refined)")
         st.plotly_chart(fig, use_container_width=True)
+        # 1. ADD THIS NEW TOOL
+@tool
+def investment_advisor(bhk: int, sqft: int, current_listing_price: float, year_built: int):
+    """
+    Analyzes if a property is a good investment. 
+    Compares listing price to market fair value.
+    """
+    # Get Fair Market Value from our logic
+    fair_market_value = get_refined_prediction(bhk, sqft, year_built)
+    
+    # Get Future Value (assuming 5 years of appreciation)
+    future_value = get_refined_prediction(bhk, sqft, year_built + 5)
+    
+    profit_potential = future_value - current_listing_price
+    roi = (profit_potential / current_listing_price) * 100
+    
+    # Valuation Gap
+    is_underpriced = current_listing_price < fair_market_value
+    
+    analysis = (
+        f"Fair Market Value: ₹{fair_market_value}L. "
+        f"Predicted Value in 5 years: ₹{future_value}L. "
+        f"Potential ROI: {round(roi, 2)}%. "
+        f"Underpriced: {'Yes' if is_underpriced else 'No'}."
+    )
+    return analysis
+
+# 2. UPDATE THE AGENT PROMPT
+# Change your agent prompt to include these instructions:
+instructions = """You are an elite Indian Real Estate Investment Advisor.
+When users ask about investing, use your tools to check the fair market price.
+If the listing price is lower than the fair market price, recommend it as a 'Value Buy'.
+Focus on major Indian cities like Delhi NCR, Mumbai, and Bangalore.
+Always explain the 'Potential Price Rise' based on the investment_advisor tool."""
+
+# 3. ADD BOTH TOOLS TO THE AGENT
+tools = [property_price_predictor, investment_advisor]
+# ... (rest of your agent initialization remains the same)
 
 # ==========================================
 # 4. AI CHAT INTERFACE
