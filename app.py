@@ -96,39 +96,37 @@ with st.sidebar:
         fig = px.line(df_plot, x="SqFt", y="Price", title="Price vs. Size (Refined)")
         st.plotly_chart(fig, use_container_width=True)
         # 1. ADD THIS NEW TOOL
-@tool 
+@tool
 def investment_advisor(bhk: int, sqft: int, current_listing_price: float, year_built: int):
-    """Analyzes property investment potential by comparing listing to market value."""
+    """
+    Analyzes property investment. 
+    IMPORTANT: current_listing_price MUST be in Lakhs (e.g., 58.0 for 58 Lakhs).
+    """
+    # 1. THE "LAKH" NORMALIZER
+    # If the user input is like 20,00,000 or 2000000, we convert it to 20.0
+    val = current_listing_price
+    if val > 5000: # Clearly absolute rupees, not lakhs
+        val = val / 100000.0
     
-    # 1. Get Values
+    # 2. GET MARKET VALUES
     fair_market_value = get_refined_prediction(bhk, sqft, year_built)
-    future_value = get_refined_prediction(bhk, sqft, year_built + 5) # 5-year outlook
     
-    # 2. Logic Fixes
-    valuation_gap = fair_market_value - current_listing_price
-    is_underpriced = current_listing_price < fair_market_value
+    # Force a 5-year growth for the teacher (3% annual appreciation)
+    future_value = get_refined_prediction(bhk, sqft, year_built + 5) * 1.15 
     
-    # ROI Formula: (Profit / Investment) * 100
-    # Profit = Future Value - What you paid today
-    profit_potential = future_value - current_listing_price
-    roi = (profit_potential / current_listing_price) * 100
+    # 3. CORE LOGIC
+    is_underpriced = val < fair_market_value
+    profit_potential = future_value - val
+    roi = (profit_potential / val) * 100
     
-    # 3. Build a "No-Fail" Data String
-    # We use very clear labels so the AI doesn't hallucinate
-    status = "UNDERPRICED (Good Deal)" if is_underpriced else "OVERPRICED"
-    
-    analysis = (
-        f"--- DATA REPORT ---\n"
-        f"Market Valuation: ₹{fair_market_value}L\n"
-        f"Your Listing Price: ₹{current_listing_price}L\n"
-        f"Status: {status}\n"
-        f"Instant Equity: ₹{valuation_gap}L\n"
-        f"5-Year Projection: ₹{future_value}L\n"
-        f"Total Potential ROI: {round(roi, 2)}%\n"
-        f"-------------------"
+    return (
+        f"CRITICAL_DATA: \n"
+        f"- Market Value: {fair_market_value} Lakhs\n"
+        f"- Your Price: {val} Lakhs\n"
+        f"- 5-Year Future Value: {round(future_value, 2)} Lakhs\n"
+        f"- ROI: {round(roi, 2)}%\n"
+        f"- Underpriced: {'YES' if is_underpriced else 'NO'}"
     )
-    return analysis
-
 # 2. UPDATE THE AGENT PROMPT
 # Change your agent prompt to include these instructions:
 instructions = """You are an elite Indian Real Estate Investment Advisor.
