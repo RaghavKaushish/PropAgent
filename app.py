@@ -178,6 +178,17 @@ if prompt := st.chat_input("Ask: Is a 3BHK for 80L a good investment?"):
             
             # The AI decides which tool to use
             ai_msg = llm_with_tools.invoke(prompt)
+            # Change this part of your code:
+
+
+# If the model didn't call a tool, it returns a message object.
+# We must extract ONLY the text content.
+if not ai_msg.tool_calls:
+    response_text = ai_msg.content  # <--- THIS IS THE KEY LINE
+else:
+    # ... your tool handling logic ...
+    # When you get final_resp from the tool:
+    response_text = final_resp.content # <--- ALSO EXTRACT CONTENT HERE
             
             if ai_msg.tool_calls:
                 responses = []
